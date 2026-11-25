@@ -1,8 +1,10 @@
 # Arquitetura e explicação do código
 
-[Voltar ao README](../README.md)
+[Voltar ao README](../README.md) · [Montagem](montagem.md) · [Evidências de bancada](evidencias.md)
 
 O sistema tem três responsabilidades. O computador comanda a operação pela USB local. O firmware fragmenta, protege e confirma os dados. O rádio de 433 MHz transporta os quadros entre as estações. O OLED fica ligado somente a B.
+
+O rádio trabalha com RF bruta. O firmware faz a modulação pelo GPIO de saída e interpreta os pulsos pela entrada analógica, conforme a [pinagem da montagem](montagem.md#ligações-elétricas).
 
 ```mermaid
 sequenceDiagram
@@ -26,12 +28,12 @@ sequenceDiagram
 
 | Arquivo | Responsabilidade | Pontos de entrada |
 | --- | --- | --- |
-| [Estacao_A.ino](../firmware/Estacao_A/Estacao_A.ino) e [Estacao_B.ino](../firmware/Estacao_B/Estacao_B.ino) | Iniciam a serial e o rádio. B também inicia o display. | `setup()` e `loop()` |
-| [Radio.h](../firmware/Estacao_A/Radio.h) | Define o quadro, implementa o FCS e converte os bytes em pulsos Manchester e vice-versa. | `calcularFCS()`, `transmitir()`, `receber()` |
-| [Aplicacao.h](../firmware/Estacao_A/Aplicacao.h) | Interpreta comandos, fragmenta o conteúdo, faz Stop-and-Wait e remonta a recepção. | `comandoSerial()`, `enviarArquivo()`, `enviarQuadro()`, `processar()` |
-| [Tela.h](../firmware/Estacao_B/Tela.h) | Inicializa o I²C e exibe texto com U8g2 na configuração usada em B. | `iniciarTela()` e `exibir()` |
-| [Imagem.h](../firmware/Estacao_A/Imagem.h) | Armazena 32 bytes do bitmap monocromático de 16 × 16 pixels. | `IMAGEM` |
-| [imagem_rf.py](../computadores/imagem_rf.py) | Usa a serial para transferir PNG/JPEG ou para salvar o bitmap como PNG. | `CanalUSB`, `mensagens_de_imagem()` e `Receptor` |
+| [Estacao_A.ino](../firmware/Estacao_A/Estacao_A.ino) e [Estacao_B.ino](../firmware/Estacao_B/Estacao_B.ino) | Iniciam a serial e o rádio. B também inicia o display. | [`setup()`](../firmware/Estacao_B/Estacao_B.ino#L5-L14) e [`loop()`](../firmware/Estacao_B/Estacao_B.ino#L16-L21) |
+| [Radio.h](../firmware/Estacao_A/Radio.h) | Define o quadro, implementa o FCS e converte os bytes em pulsos Manchester e vice-versa. | [`calcularFCS()`](../firmware/Estacao_A/Radio.h#L32-L43), [`transmitir()`](../firmware/Estacao_A/Radio.h#L53-L72) e [`receber()`](../firmware/Estacao_A/Radio.h#L92-L148) |
+| [Aplicacao.h](../firmware/Estacao_A/Aplicacao.h) | Interpreta comandos, fragmenta o conteúdo, faz Stop-and-Wait e remonta a recepção. | [`comandoSerial()`](../firmware/Estacao_A/Aplicacao.h#L141), [`enviarArquivo()`](../firmware/Estacao_A/Aplicacao.h#L121-L139), [`enviarQuadro()`](../firmware/Estacao_A/Aplicacao.h#L90-L119) e [`processar()`](../firmware/Estacao_A/Aplicacao.h#L33-L88) |
+| [Tela.h](../firmware/Estacao_B/Tela.h) | Inicializa o I²C e exibe texto com U8g2 na configuração usada em B. | [`iniciarTela()`](../firmware/Estacao_B/Tela.h#L36) e [`exibir()`](../firmware/Estacao_B/Tela.h#L17-L34) |
+| [Imagem.h](../firmware/Estacao_A/Imagem.h) | Armazena 32 bytes do bitmap monocromático de 16 × 16 pixels. | [`IMAGEM`](../firmware/Estacao_A/Imagem.h#L4-L21) |
+| [imagem_rf.py](../computadores/imagem_rf.py) | Usa a serial para transferir PNG/JPEG ou para salvar o bitmap como PNG. | [`CanalUSB`](../computadores/imagem_rf.py#L149-L179), [`mensagens_de_imagem()`](../computadores/imagem_rf.py#L28-L37) e [`Receptor`](../computadores/imagem_rf.py#L65-L146) |
 
 Os arquivos `.h` comuns estão nas duas pastas para que cada sketch possa ser aberto e gravado separadamente pela Arduino IDE. Em cada loop, a estação procura um quadro e verifica se há um comando vindo do computador. A direção do envio é definida por quem digita o comando.
 
@@ -66,6 +68,8 @@ No ensaio com **Olá mundo!**, o primeiro quadro de conteúdo tem 12 bytes no ca
 | Quadro após a corrupção | `01 01 0C 02 4E 6C C3 A1 20 6D 75 6E 64 6F 21` | `F8` |
 
 O receptor recebe o FCS `E7` e calcula `F8` a partir dos bytes alterados. Como os valores divergem, descarta a primeira tentativa. Na retransmissão, o emissor envia os bytes originais.
+
+Os [registros do ensaio de erro](evidencias.md#detecção-e-retransmissão) mostram a divergência do FCS, a tentativa seguinte e a mensagem remontada.
 
 ## 3. Stop-and-Wait ARQ
 
