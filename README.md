@@ -4,7 +4,7 @@
 
 Projeto final de **Transmissão e Comunicação de Dados** do curso de Engenharia da Computação do IFMT. Duas estações ESP32 trocam mensagens e pequenas imagens por rádio de **433 MHz**. O firmware usa **CRC-8** para detectar erros e **Stop-and-Wait ARQ** para retransmitir quadros que ficaram sem confirmação.
 
-[Como executar](#como-executar) · [Montagem](docs/montagem.md) · [Código e protocolo](docs/arquitetura.md) · [Evidências de bancada](docs/evidencias.md) · [Roteiro de testes](docs/testes.md)
+[Montagem e pinagem](#montagem-e-pinagem) · [Protocolo](#protocolo-de-comunicação) · [Como executar](#como-executar) · [Testes e resultados](#testes-e-resultados) · [Código-fonte](#onde-está-o-código)
 
 ## O projeto na bancada
 
@@ -14,13 +14,63 @@ Projeto final de **Transmissão e Comunicação de Dados** do curso de Engenhari
 
 Os computadores se conectam às estações por USB. Entre os ESP32, tanto os dados quanto as confirmações passam pelos módulos de rádio. Cada estação tem um transmissor e um receptor para permitir a troca de papéis, com um envio por vez. Na demonstração, A envia e B exibe o texto no OLED ou entrega os dados ao computador receptor.
 
-| Ensaio | Resultado observado | Evidência |
-| --- | --- | --- |
-| Texto e OLED | B exibiu a mensagem `TESTE` recebida de A. | [Foto do OLED](docs/evidencias.md#texto-no-oled) |
-| Erro proposital | B descartou o quadro com CRC inválido. A retransmitiu, e B entregou o texto correto. | [Monitores seriais de A e B](docs/evidencias.md#detecção-e-retransmissão) |
-| Arquivo de imagem | O programa remontou o PNG de teste de 134 bytes e salvou o arquivo no computador B. | [Pasta do receptor](docs/evidencias.md#arquivo-de-imagem) |
-| Alcance | A equipe concluiu um envio a **110 cm (1,10 m)** entre as estações. | [Foto da bancada com a trena](docs/evidencias.md#alcance) |
-| Ensaio sob ruído | Pendente. | [Como registrar o ensaio](docs/testes.md#roteiro-de-demonstração) |
+## Montagem e pinagem
+
+Cada estação usa um **ESP32 DevKit**, uma protoboard, um transmissor de 433 MHz (FS1000A como referência), um receptor de 433 MHz (MX-RM-5V como referência), dois resistores de **10 kΩ**, jumpers e um cabo USB de dados. Em B, um **OLED SSD1306 I²C de 128 × 64** mostra o texto recebido.
+
+| Pino do componente | Ligação na bancada |
+| --- | --- |
+| DATA do transmissor | GPIO25 do ESP32 local. |
+| VCC do transmissor | VIN na montagem documentada, com o ESP32 alimentado por USB. |
+| DATA do receptor | R1 do divisor de tensão. A junção de R1 e R2 vai ao GPIO34. |
+| VCC do receptor | 5 V no esquema de referência do MX-RM-5V. |
+| GND dos módulos RF | GND do ESP32 da própria estação. |
+| VCC e GND do OLED de B | 3V3 e GND do ESP32 B. |
+| SDA e SCL do OLED de B | GPIO21 e GPIO22, respectivamente. |
+
+Em cada receptor, R1 liga a saída DATA ao GPIO34 e R2 liga essa junção ao GND. Com dois resistores de 10 kΩ, uma saída de 5 V equivale a **2,5 V** na entrada analógica no cálculo ideal. Confira a posição dos pinos no seu módulo antes de conectar. [Guia completo de montagem](docs/montagem.md)
+
+## Protocolo de comunicação
+
+O ESP32 envia pulsos diretamente ao transmissor. Na recepção, o ESP32 amostra a saída do módulo RF pela entrada analógica no GPIO34, ajusta o limiar de leitura e decodifica as transições **Manchester**. Cada bit ocupa duas metades de 1 ms, o que corresponde a uma taxa nominal de **500 bit/s**. O preâmbulo, os ACKs e as retransmissões aumentam o tempo total de envio.
+
+```mermaid
+sequenceDiagram
+    participant PC_A as Computador A
+    participant A as ESP32 A
+    participant B as ESP32 B
+    participant PC_B as Computador B
+    PC_A->>A: Comando pela USB
+    loop Para cada quadro
+        A->>B: DATA ou END por rádio
+        alt Quadro válido
+            B-->>A: ACK da mesma sequência
+        else Quadro corrompido
+            B->>B: Descarte pelo FCS
+            A->>A: Timeout e retransmissão
+        end
+    end
+    B->>PC_B: Conteúdo remontado pela USB
+```
+
+### Formato dos quadros
+
+| Campo | Bytes | Função |
+| --- | ---: | --- |
+| `FLAG` | 1 | Marca o início do quadro com `0x7E`. |
+| `TYPE` | 1 | Identifica `DATA` (`0x01`), `ACK` (`0x02`) ou `END` (`0x03`). |
+| `SEQ` | 1 | Identifica a sequência do quadro. O ACK repete esse número. |
+| `LEN` | 1 | Informa quantos bytes estão no campo `DATA`. |
+| `DATA` | 0–16 | Carrega os metadados ou um trecho do conteúdo. O campo é vazio em ACK e END. |
+| `FCS` | 1 | Guarda a verificação de `TYPE`, `SEQ`, `LEN` e `DATA`. |
+
+O primeiro quadro DATA, com `seq=0`, anuncia o formato e o tamanho da mensagem. Os quadros seguintes levam até **15 bytes úteis** por vez, mais um byte que identifica o trecho como conteúdo. O quadro END encerra a transferência depois que todos os trechos são confirmados.
+
+### Detecção de erros e retransmissão
+
+O FCS pode usar **checksum** (soma dos bytes módulo 256) ou **CRC-8** (polinômio `0x07`). A calcula o FCS antes do envio. B refaz o cálculo com os bytes recebidos e descarta o quadro se os valores divergirem.
+
+Com **Stop-and-Wait ARQ**, A envia um quadro por vez e espera cerca de **1,2 s** pelo ACK da mesma sequência. Quando a espera vence, A retransmite o quadro, até **seis tentativas no total**. Se B já aceitou o quadro, reenvia o ACK e só incorpora o conteúdo na primeira recepção válida. O END é confirmado quando o total recebido coincide com o anunciado no início. [Detalhes dos quadros, do CRC-8 e do Stop-and-Wait](docs/arquitetura.md)
 
 ## Como executar
 
@@ -46,7 +96,7 @@ O limite de texto é de **256 bytes** por mensagem. Para registrar o teste de er
 
 ### 3. Transfira um arquivo de imagem pelo PowerShell
 
-Use o mesmo firmware nas duas placas. Feche os Monitores Seriais para liberar as portas. Em cada computador, abra o PowerShell na pasta raiz do repositório e execute os comandos com Python 3.8 ou superior instalado.
+Use os sketches das estações A e B gravados no passo 1. Feche os Monitores Seriais para liberar as portas. Em cada computador, abra o PowerShell na pasta raiz do repositório e execute os comandos com Python 3.8 ou superior instalado.
 
 ```powershell
 cd .\computadores
@@ -69,6 +119,38 @@ Use a porta atribuída à sua placa no lugar de `COM3` ou `COM4`. O programa ati
 
 Para enviar outra imagem, passe o caminho de um PNG ou JPEG pequeno. O comando `IMAGEM` do Arduino também pode gerar um PNG em B quando o programa Python estiver em modo `receber` e A estiver em CRC-8.
 
+### Como a imagem é remontada
+
+No envio de um PNG ou JPEG, o Python divide o arquivo em blocos de até **165 bytes**, codifica cada bloco em Base64 e envia os blocos ao ESP32 em mensagens `@IMG433`. O firmware transporta cada mensagem pelo rádio usando os mesmos quadros e ACKs do texto. No PC B, o programa confere a ordem dos blocos, o tamanho, a assinatura do formato e o **SHA-256** do arquivo completo antes de salvar. [Fluxo do texto, do bitmap e dos arquivos](docs/arquitetura.md#4-texto-bitmap-e-arquivo-de-imagem)
+
+## Testes e resultados
+
+| Ensaio | Resultado observado | Evidência |
+| --- | --- | --- |
+| Texto e OLED | B exibiu a mensagem `TESTE` recebida de A. | [Foto do OLED](docs/evidencias.md#texto-no-oled) |
+| Erro proposital | B descartou o quadro com CRC inválido. A retransmitiu, e B entregou o texto correto. | [Monitores Seriais de A e B](docs/evidencias.md#detecção-e-retransmissão) |
+| Arquivo de imagem | O programa remontou o PNG de teste de 134 bytes e salvou o arquivo no computador B. | [Pasta do receptor](docs/evidencias.md#arquivo-de-imagem) |
+| Alcance | A equipe concluiu um envio a **110 cm (1,10 m)** entre as estações. | [Foto da bancada com a trena](docs/evidencias.md#alcance) |
+| Ensaio sob ruído | Pendente. | [Como registrar o ensaio](docs/testes.md#roteiro-de-demonstração) |
+
+### Exemplo de detecção e recuperação
+
+No teste com `ERRO TEXTO Olá mundo!`, A calculou `E7` para o quadro `seq=1` e alterou o primeiro byte do texto de `4F` para `4E`. B recalculou o CRC e obteve `F8`, por isso registrou `FCS_INVALIDO` e descartou o quadro sem enviar ACK. A atingiu o `TIMEOUT` e enviou os bytes originais na tentativa seguinte. B aceitou o quadro, confirmou a sequência 1 e exibiu o texto correto após o END.
+
+![Monitor Serial de B mostrando CRC inválido, ACK da tentativa seguinte e o texto Olá mundo! recebido.](docs/assets/erro-estacao-b.png)
+
+### Leitura dos registros
+
+| Registro | O que indica |
+| --- | --- |
+| `FCS_INVALIDO` repetido | O FCS calculado divergiu do recebido. Confira com `STATUS` se A e B usam o mesmo modo. |
+| `TIMEOUT` ou `FALHA` | A não recebeu o ACK no prazo. Confira se B está ligado e teste a comunicação a curta distância. |
+| `DUPLICADO` | B reconheceu um quadro já processado e reenviou o ACK. |
+| `ENVIO CONCLUIDO` | O emissor recebeu o ACK do END de uma mensagem. |
+| `Imagem salva em` | O computador B remontou e gravou o arquivo no caminho mostrado. |
+
+Veja também como testar a ausência de ACK, liberar uma porta serial ocupada e comparar os arquivos pelo SHA-256. [Roteiro completo de testes](docs/testes.md)
+
 ## Onde está o código
 
 | Caminho | Conteúdo |
@@ -78,7 +160,14 @@ Para enviar outra imagem, passe o caminho de um PNG ou JPEG pequeno. O comando `
 | [`computadores/`](computadores/) | Interface serial em Python, transferência e gravação da imagem no PC. |
 | [`docs/`](docs/) | Montagem, formato dos quadros, leitura do código, testes e evidências. |
 
-O [guia do código](docs/arquitetura.md#onde-ler-o-código) liga cada etapa do protocolo às funções que a implementam. Ele inclui os bytes do teste de CRC e a diferença entre a confirmação de um quadro pelo ESP32 e a gravação do arquivo pelo computador receptor.
+| Função | Responsabilidade |
+| --- | --- |
+| [`calcularFCS()`](firmware/Estacao_A/Radio.h#L32-L43) | Calcula o checksum ou o CRC-8 dos bytes protegidos. |
+| [`enviarQuadro()`](firmware/Estacao_A/Aplicacao.h#L90-L119) | Envia o quadro, aguarda o ACK e controla as tentativas. |
+| [`processar()`](firmware/Estacao_A/Aplicacao.h#L33-L88) | Trata início, conteúdo e fim de uma transferência recebida. |
+| [`Receptor.receber_arquivo()`](computadores/imagem_rf.py#L100-L134) | Remonta e valida o PNG ou JPEG recebido pelo computador. |
+
+[Guia das funções do firmware em C++ e do programa em Python](docs/arquitetura.md#onde-ler-o-código)
 
 ## Equipe
 
