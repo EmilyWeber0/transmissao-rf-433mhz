@@ -1,8 +1,10 @@
 # Montagem das estações
 
-[Voltar ao README](../README.md)
+[Voltar ao README](../README.md) · [Roteiro de testes](testes.md)
 
 Cada protoboard recebe um ESP32, um transmissor e um receptor de 433 MHz. A estação B também recebe o display OLED. Alimente as placas por USB, uma em cada computador, e use o GND da própria placa como referência para os componentes conectados a ela.
+
+![Estações A e B com os ESP32 encaixados nas protoboards e o OLED montado em B.](assets/estacoes.png)
 
 ## Materiais
 
