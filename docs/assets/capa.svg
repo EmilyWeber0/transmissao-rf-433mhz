@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="324" viewBox="0 0 1200 324" role="img" aria-labelledby="titulo descricao">
+  <title id="titulo">Enlace de rádio em 433 MHz</title>
+  <desc id="descricao">A estação A envia quadros DATA e END para a estação B, que responde com ACK.</desc>
+  <defs>
+    <linearGradient id="fundo" x2="1" y2="1">
+      <stop stop-color="#102524"/>
+      <stop offset="1" stop-color="#081516"/>
+    </linearGradient>
+    <pattern id="malha" width="20" height="20" patternUnits="userSpaceOnUse">
+      <path d="M20 0H0V20" fill="none" stroke="#274442" stroke-width="0.7"/>
+    </pattern>
+    <clipPath id="painel">
+      <rect x="600" y="36" width="564" height="252" rx="20"/>
+    </clipPath>
+  </defs>
+  <rect width="1200" height="324" rx="26" fill="url(#fundo)"/>
+  <rect x="0.5" y="0.5" width="1199" height="323" rx="25.5" fill="none" stroke="#345754"/>
+
+  <g font-family="Inter, DejaVu Sans, sans-serif">
+    <path d="M56 75h19" stroke="#f5c56b" stroke-width="3" stroke-linecap="round"/>
+    <text x="88" y="81" fill="#f5c56b" font-size="20" font-weight="700" letter-spacing="2">ENLACE DE RÁDIO</text>
+    <text x="52" y="177" fill="#f2f8f5" font-size="95" font-weight="700" letter-spacing="-4">433 MHz</text>
+    <text x="56" y="231" fill="#b2cdc5" font-size="26">Texto e imagens entre dois ESP32</text>
+    <path d="M56 270h42v-14h22v14h22v-14h22v14h22v-14h22v14h331"
+          fill="none" stroke="#56837a" stroke-width="2" stroke-linejoin="round"/>
+
+    <rect x="600" y="36" width="564" height="252" rx="20" fill="#102322" stroke="#355955"/>
+    <rect x="600" y="36" width="564" height="252" fill="url(#malha)" clip-path="url(#painel)"/>
+
+    <g text-anchor="middle">
+      <rect x="634" y="87" width="134" height="150" rx="14" fill="#142f2c" stroke="#548678"/>
+      <text x="701" y="151" fill="#e5f7ef" font-size="47" font-weight="700">A</text>
+      <path d="M674 170h54" stroke="#548678"/>
+      <text x="701" y="201" fill="#b2cdc5" font-size="19">ESP32</text>
+
+      <rect x="996" y="87" width="134" height="150" rx="14" fill="#142f2c" stroke="#548678"/>
+      <text x="1063" y="151" fill="#e5f7ef" font-size="47" font-weight="700">B</text>
+      <path d="M1036 170h54" stroke="#548678"/>
+      <text x="1063" y="201" fill="#b2cdc5" font-size="19">ESP32</text>
+
+      <text x="882" y="132" fill="#f5c56b" font-size="19" font-weight="700" letter-spacing="1">DATA / END</text>
+      <text x="882" y="215" fill="#95e4cc" font-size="19" font-weight="700" letter-spacing="1">ACK</text>
+    </g>
+
+    <path d="M786 149h192m-10-8 10 8-10 8" fill="none" stroke="#f5c56b" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M978 182H786" fill="none" stroke="#95e4cc" stroke-width="2.5" stroke-linecap="round" stroke-dasharray="6 5"/>
+    <path d="M796 174l-10 8 10 8" fill="none" stroke="#95e4cc" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+</svg>
