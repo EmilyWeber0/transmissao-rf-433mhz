@@ -32,27 +32,6 @@ Em cada receptor, R1 liga a saída DATA ao GPIO34 e R2 liga essa junção ao GND
 
 ## Protocolo de comunicação
 
-O ESP32 envia pulsos diretamente ao transmissor. Na recepção, o ESP32 amostra a saída do módulo RF pela entrada analógica no GPIO34, ajusta o limiar de leitura e decodifica as transições **Manchester**. Cada bit ocupa duas metades de 1 ms, o que corresponde a uma taxa nominal de **500 bit/s**. O preâmbulo, os ACKs e as retransmissões aumentam o tempo total de envio.
-
-```mermaid
-sequenceDiagram
-    participant PC_A as Computador A
-    participant A as ESP32 A
-    participant B as ESP32 B
-    participant PC_B as Computador B
-    PC_A->>A: Comando pela USB
-    loop Para cada quadro
-        A->>B: DATA ou END por rádio
-        alt Quadro válido
-            B-->>A: ACK da mesma sequência
-        else Quadro corrompido
-            B->>B: Descarte pelo FCS
-            A->>A: Timeout e retransmissão
-        end
-    end
-    B->>PC_B: Conteúdo remontado pela USB
-```
-
 ### Formato dos quadros
 
 | Campo | Bytes | Função |
