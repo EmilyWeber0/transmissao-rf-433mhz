@@ -1,64 +1,87 @@
-# Transmissão confiável de dados por rádio de 433 MHz
+![Enlace de 433 MHz. A envia DATA e END para B, que retorna ACK.](docs/assets/capa.svg)
 
-Projeto final de **Transmissão e Comunicação de Dados** do curso de Engenharia da Computação do IFMT. Duas estações ESP32 trocam texto e imagens por módulos de 433 MHz. O firmware verifica os quadros com **CRC-8** ou **checksum de 8 bits** e retransmite perdas com **Stop-and-Wait ARQ**. A estação B exibe texto no OLED e pode salvar imagens no computador.
+# Transmissão de texto e imagens com ESP32
 
-| Guia | Conteúdo |
-| --- | --- |
-| [Montagem](docs/montagem.md) | Componentes, pinagem, divisor de tensão e gravação dos ESP32. |
-| [Arquitetura e código](docs/arquitetura.md) | Formato dos quadros, Manchester, cálculo do CRC e funções do firmware e do Python. |
-| [Testes e resultados](docs/testes.md) | Roteiro da demonstração, leitura dos logs e resultados de bancada. |
+Projeto final de **Transmissão e Comunicação de Dados** do curso de Engenharia da Computação do IFMT. Duas estações ESP32 trocam mensagens e pequenas imagens por rádio de **433 MHz**. O firmware usa **CRC-8** para detectar erros e **Stop-and-Wait ARQ** para retransmitir quadros que ficaram sem confirmação.
 
-## Como as estações se comunicam
+[Como executar](#como-executar) · [Montagem](docs/montagem.md) · [Código e protocolo](docs/arquitetura.md) · [Evidências de bancada](docs/evidencias.md) · [Roteiro de testes](docs/testes.md)
 
-O computador A envia o comando ao ESP32 A por USB. A transmite os quadros por rádio, B valida os dados e responde com um ACK pelo mesmo enlace. B remonta a mensagem e a entrega ao seu computador pela USB local. Cada estação tem um transmissor e um receptor de 433 MHz. Envie em um sentido por vez.
+## O projeto na bancada
 
-## 1. Prepare os ESP32
+![Duas estações montadas em protoboard, com ESP32 e módulos de 433 MHz em ambas e OLED na estação B.](docs/assets/estacoes.png)
 
-1. [Monte as duas estações](docs/montagem.md) e conecte cada placa ao respectivo computador por USB.
-2. Na Arduino IDE, instale **esp32 by Espressif Systems** pelo Gerenciador de Placas e **U8g2** pelo Gerenciador de Bibliotecas para compilar o sketch de B com OLED.
-3. Abra [Estacao_A.ino](firmware/Estacao_A/Estacao_A.ino) para gravar a placa A e [Estacao_B.ino](firmware/Estacao_B/Estacao_B.ino) para gravar a placa B. Mantenha os arquivos `.h` junto ao sketch. Selecione **ESP32 Dev Module** para a placa usada no ensaio e a porta correspondente.
-4. Abra os dois Monitores Seriais em **115200 baud**, com final de linha **Nova linha**. Envie `MODO CRC` e depois `STATUS` em **cada** estação. Confirme `FCS=CRC-8` nos dois lados. O firmware inicializa em checksum após reiniciar.
+*Estação A à esquerda e estação B à direita, com os ESP32 encaixados nas protoboards.*
 
-## 2. Envie texto e simule um erro
+Os computadores se conectam às estações por USB. Entre os ESP32, tanto os dados quanto as confirmações passam pelos módulos de rádio. Cada estação tem um transmissor e um receptor para permitir a troca de papéis, com um envio por vez. Na demonstração, A envia e B exibe o texto no OLED ou entrega os dados ao computador receptor.
 
-Digite um comando por vez no Monitor Serial de A. Deixe o Monitor Serial de B aberto para acompanhar a recepção.
+| Ensaio | Resultado observado | Evidência |
+| --- | --- | --- |
+| Texto e OLED | B exibiu a mensagem `TESTE` recebida de A. | [Foto do OLED](docs/evidencias.md#texto-no-oled) |
+| Erro proposital | B descartou o quadro com CRC inválido. A retransmitiu, e B entregou o texto correto. | [Monitores seriais de A e B](docs/evidencias.md#detecção-e-retransmissão) |
+| Arquivo de imagem | O programa remontou o PNG de teste de 134 bytes e salvou o arquivo no computador B. | [Pasta do receptor](docs/evidencias.md#arquivo-de-imagem) |
+| Alcance | A equipe concluiu um envio a **110 cm (1,10 m)** entre as estações. | [Foto da bancada com a trena](docs/evidencias.md#alcance) |
+| Ensaio sob ruído | Pendente. | [Como registrar o ensaio](docs/testes.md#roteiro-de-demonstração) |
 
-| Comando | Resultado esperado |
-| --- | --- |
-| `TEXTO TESTE` | B mostra `Texto recebido: TESTE` e apresenta o texto no OLED. |
-| `ERRO TEXTO Olá mundo!` | B detecta a divergência de FCS na sequência 1. A retransmite o quadro e B entrega o texto completo. |
-| `IMAGEM` | B reconstrói o desenho de 16 × 16 pixels no Monitor Serial. O OLED mostra `Imagem recebida`. |
-| `ERRO IMAGEM` | Executa a mesma injeção de erro no primeiro quadro de conteúdo do bitmap. |
-| `MODO CHECKSUM` | Ativa a soma de 8 bits. Envie o comando também na outra estação. |
-| `MODO CRC` / `STATUS` | Ativa o CRC-8 / mostra o modo de FCS e o estado da recepção. |
+## Como executar
 
-O texto tem limite de **256 bytes**, incluindo os bytes adicionais de caracteres UTF-8. Para uma demonstração legível no OLED, use uma mensagem ASCII curta, como `TESTE`. Para confirmar a recuperação do erro, compare `FCS_INVALIDO` em B com `TIMEOUT`, nova tentativa e `ACK recebido` em A. Os eventos devem ter a mesma sequência.
+### 1. Monte e grave as estações
 
-## 3. Transfira um arquivo PNG ou JPEG
+1. Use o [guia de montagem](docs/montagem.md) para conferir os componentes, o divisor de tensão e a pinagem de A e B.
+2. Instale o pacote **esp32 by Espressif Systems** e a biblioteca **U8g2** na Arduino IDE.
+3. Abra [Estacao_A.ino](firmware/Estacao_A/Estacao_A.ino) e [Estacao_B.ino](firmware/Estacao_B/Estacao_B.ino) para gravar as respectivas placas. Use o perfil **ESP32 Dev Module** e mantenha os arquivos `.h` na pasta de cada sketch.
 
-Use Python 3.8 ou superior. Em ambos os computadores, abra o PowerShell na pasta raiz do repositório. Feche os Monitores Seriais para liberar as portas e instale a dependência.
+### 2. Envie texto ou o bitmap pelo Arduino IDE
+
+Abra os dois Monitores Seriais em **115200 baud**, com final de linha **Nova linha**. Nos dois lados, envie `MODO CRC` e depois `STATUS` para conferir `FCS=CRC-8`. O firmware volta a checksum quando reinicia.
+
+| Onde digitar | Comando | O que observar |
+| --- | --- | --- |
+| A | `TEXTO TESTE` | B imprime a mensagem no Monitor Serial e a mostra no OLED. |
+| A | `ERRO TEXTO Olá mundo!` | B registra `FCS_INVALIDO`. A mostra o timeout e retransmite o quadro. B entrega o texto correto. |
+| A | `IMAGEM` | B imprime o bitmap de 16 × 16 pixels e mostra `Imagem recebida` no OLED. |
+| A | `ERRO IMAGEM` | A altera um bit do primeiro quadro de conteúdo do bitmap para testar a retransmissão. |
+| A e B | `MODO CHECKSUM` | Seleciona o checksum de 8 bits para comparar com o teste em CRC-8. |
+
+O limite de texto é de **256 bytes** por mensagem. Para registrar o teste de erro, compare o número de sequência nos logs de A e B do mesmo envio.
+
+### 3. Transfira um arquivo de imagem pelo PowerShell
+
+Use o mesmo firmware nas duas placas. Feche os Monitores Seriais para liberar as portas. Em cada computador, abra o PowerShell na pasta raiz do repositório e execute os comandos com Python 3.8 ou superior instalado.
 
 ```powershell
 cd .\computadores
 py -m pip install -r .\requirements.txt
 ```
 
-**Computador B** — inicie a recepção e aguarde `Receptor pronto`:
+No **computador B**, inicie a recepção e aguarde `Receptor pronto`.
 
 ```powershell
 py .\imagem_rf.py receber COM4
 ```
 
-**Computador A** — a partir da mesma pasta, envie o [PNG de teste](computadores/teste.png), de 134 bytes:
+No **computador A**, envie o [PNG de teste](computadores/teste.png).
 
 ```powershell
 py .\imagem_rf.py enviar COM3 ".\teste.png"
 ```
 
-Substitua `COM3` e `COM4` pelas portas atribuídas às placas. O programa coloca cada estação em CRC-8 ao abrir sua porta. Abra o PNG em **`computadores/recebidos/`** no PC B após a mensagem `Imagem salva em`. Use `Ctrl+C` para encerrar o receptor e liberar a porta. Para enviar outra imagem pequena, passe o caminho de um PNG ou JPEG entre aspas.
+Use a porta atribuída à sua placa no lugar de `COM3` ou `COM4`. O programa ativa CRC-8 ao abrir cada porta. Quando B mostrar `Imagem salva em`, abra o arquivo em `computadores/recebidos/`. Encerre a recepção com `Ctrl+C` para liberar a porta.
 
-O comando `IMAGEM` também pode gerar um PNG. Deixe o programa Python rodando em B no modo `receber`, configure A em CRC-8 e envie `IMAGEM` pelo Monitor Serial de A. O script converte as linhas do bitmap recebidas pela serial em arquivo.
+Para enviar outra imagem, passe o caminho de um PNG ou JPEG pequeno. O comando `IMAGEM` do Arduino também pode gerar um PNG em B quando o programa Python estiver em modo `receber` e A estiver em CRC-8.
 
-## Resultados registrados
+## Onde está o código
 
-A equipe registrou a recepção de texto, a exibição da mensagem no OLED, a detecção e recuperação de um quadro corrompido e a gravação do PNG no computador B. Um envio de bancada foi concluído com as estações a **1,10 m**. O ensaio sob ruído permanece pendente. A [página de testes](docs/testes.md) descreve as evidências e como repetir cada cenário.
+| Caminho | Conteúdo |
+| --- | --- |
+| [`firmware/Estacao_A/`](firmware/Estacao_A/) | Sketch da estação A e módulos de rádio, protocolo e bitmap. |
+| [`firmware/Estacao_B/`](firmware/Estacao_B/) | Sketch da estação B com os módulos compartilhados e o OLED habilitado. |
+| [`computadores/`](computadores/) | Interface serial em Python, transferência e gravação da imagem no PC. |
+| [`docs/`](docs/) | Montagem, formato dos quadros, leitura do código, testes e evidências. |
+
+O [guia do código](docs/arquitetura.md#onde-ler-o-código) liga cada etapa do protocolo às funções que a implementam. Ele inclui os bytes do teste de CRC e a diferença entre a confirmação de um quadro pelo ESP32 e a gravação do arquivo pelo computador receptor.
+
+## Equipe
+
+Emily Weber de Arruda · Giovani Eduardo de Sousa Filho · Pedro da Silva Correa
+
+Engenharia da Computação, IFMT – Campus Cuiabá Cel. Octayde Jorge da Silva. Disciplina de Transmissão e Comunicação de Dados, professor Ruy Oliveira, 2026.
