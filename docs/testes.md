@@ -1,6 +1,6 @@
 # Testes e resultados
 
-[Voltar ao README](../README.md)
+[Voltar ao README](../README.md) · [Fotos e registros dos testes](evidencias.md)
 
 Os testes de bancada registraram envio de texto, exibição no OLED, recuperação após injeção de erro, reconstrução do PNG e comunicação a 1,10 m. Um ensaio específico sob ruído permanece pendente.
 
@@ -13,7 +13,8 @@ Configure os dois ESP32 no mesmo modo de FCS. Para seguir o ensaio registrado, u
 | Texto | Envie `TEXTO TESTE` em A. | ACKs e conclusão em A. Mensagem recebida no Monitor Serial e no OLED de B. |
 | Erro proposital | Envie `ERRO TEXTO Olá mundo!` em A. | Seq. 1 corrompida na primeira tentativa, descarte em B, timeout em A, retransmissão com ACK e texto correto no receptor. |
 | Bitmap de exemplo | Envie `IMAGEM` em A. | A reconstrução dos 16 × 16 pixels em B. Com o script do PC B em escuta, confira o PNG salvo. |
-| Arquivo PNG | Siga os [comandos do README](../README.md#3-transfira-um-arquivo-png-ou-jpeg) com `teste.png`. | `Imagem salva em` no PowerShell de B e abertura do arquivo gravado na pasta `recebidos`. |
+| Arquivo PNG | Siga os [comandos do README](../README.md#3-transfira-um-arquivo-de-imagem-pelo-powershell) com `teste.png`. | `Imagem salva em` no PowerShell de B e abertura do arquivo gravado na pasta `recebidos`. |
+| Ausência de ACK | Com B desligada, envie `TEXTO TESTE` de A. | Seis tentativas do quadro de início e `FALHA: ACK nao recebido apos 6 tentativas (seq=0). Envio interrompido.` em A. |
 | Distância | Meça a separação entre as estações e repita o envio de texto. | Distância medida, mensagem em B e confirmação do END em A. |
 | Ruído | Compare dois envios com a mesma configuração e distância em condições de bancada identificadas. | Condição do ensaio, timeouts, retransmissões e conteúdo recebido. |
 
